@@ -8,16 +8,16 @@
 <meta name="keywords" content="temporary email, temp mail, disposable email, fake email, 10 hour mail, free temp email with password">
 <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
 <meta name="theme-color" content="#0f6b5c">
-<link rel="canonical" href="https://github.com/rajkumar07-git/tempmail10.git/">
+<link rel="canonical" href="https://YOUR-DOMAIN.com/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Free Temporary Email with Password – 10 Hour Inbox">
 <meta property="og:description" content="One-click disposable email address and password. Inbox stays live for 10 hours.">
-<meta property="og:url" content="https://github.com/rajkumar07-git/tempmail10.git/">
+<meta property="og:url" content="https://YOUR-DOMAIN.com/">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
-{"@type":"WebApplication","name":"TempMail10","url":"https://github.com/rajkumar07-git/tempmail10.git/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Free temporary email address and password with a 10 hour inbox."},
+{"@type":"WebApplication","name":"TempMail10","url":"https://YOUR-DOMAIN.com/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Free temporary email address and password with a 10 hour inbox."},
 {"@type":"FAQPage","mainEntity":[
 {"@type":"Question","name":"How long does the temporary email last?","acceptedAnswer":{"@type":"Answer","text":"Each address stays active for 10 hours. After that it is deleted automatically."}},
 {"@type":"Question","name":"Can I log in again with the password?","acceptedAnswer":{"@type":"Answer","text":"Yes. Every address comes with a password that you can copy and use with the same address for 10 hours."}},
@@ -185,7 +185,7 @@ footer{margin-top:40px;border-top:1px solid var(--line);padding:20px 0 40px;colo
 <script>
 (function(){
 "use strict";
-var API="https://api.mail.tm",TTL=10*3600*1000,KEY="tm10",S=null,pollId=null,openId=null,msgs=[];
+var APIS=["https://api.mail.tm","https://api.mail.gw"],API=APIS[0],TTL=10*3600*1000,KEY="tm10",S=null,pollId=null,openId=null,msgs=[];
 var $=function(s){return document.querySelector(s)};
 function esc(t){return String(t==null?"":t).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){return null}}
@@ -193,27 +193,32 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function clear(){try{localStorage.removeItem(KEY)}catch(e){}}
 function rnd(n,c){var a=new Uint32Array(n),o="";(window.crypto||window.msCrypto).getRandomValues(a);for(var i=0;i<n;i++)o+=c[a[i]%c.length];return o}
 function toast(t){var e=$("#toast");e.textContent=t;e.className="on";clearTimeout(toast.t);toast.t=setTimeout(function(){e.className=""},2200)}
-function api(path,opt){opt=opt||{};var h={"Content-Type":"application/json"};if(S&&S.token&&path!=="/token"&&path!=="/accounts")h.Authorization="Bearer "+S.token;opt.headers=h;return fetch(API+path,opt).then(function(r){if(r.status===204)return null;if(!r.ok)throw new Error(r.status);return r.json()})}
+function api(path,opt){opt=opt||{};var h={"Content-Type":"application/json"};if(S&&S.token&&path!=="/token"&&path!=="/accounts")h.Authorization="Bearer "+S.token;opt.headers=h;return fetch(((S&&S.api)||API)+path,opt).then(function(r){if(r.status===204)return null;if(!r.ok)throw new Error(r.status);return r.json()})}
 function copy(text,label){var done=function(){toast(label+" copied")};if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(done,fallback)}else fallback();function fallback(){var t=document.createElement("textarea");t.value=text;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();try{document.execCommand("copy");done()}catch(e){toast("Copy failed")}document.body.removeChild(t)}}
 
+function build(i){
+  API=APIS[i];
+  return api("/domains").then(function(d){
+    var dom=d["hydra:member"][0].domain;
+    var address=rnd(10,"abcdefghijklmnopqrstuvwxyz0123456789")+"@"+dom;
+    var password=rnd(14,"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789");
+    return api("/accounts",{method:"POST",body:JSON.stringify({address:address,password:password})}).then(function(acc){
+      return api("/token",{method:"POST",body:JSON.stringify({address:address,password:password})}).then(function(t){
+        S={api:API,address:address,password:password,id:acc.id,token:t.token,exp:Date.now()+TTL,out:[]};save();show();startPoll();fetchMsgs();
+      })
+    })
+  }).catch(function(err){if(i+1<APIS.length)return build(i+1);throw err})
+}
 function create(){
   stopPoll();openId=null;msgs=[];
   $("#addr").textContent="Creating…";$("#pass").textContent="…";
   $("#p-in").innerHTML='<div class="empty"><span class="spin"></span>Setting up your inbox…</div>';
   var old=S;S=null;
   var del=old&&old.id?(S=old,api("/accounts/"+old.id,{method:"DELETE"}).catch(function(){}).then(function(){S=null})):Promise.resolve();
-  return del.then(function(){return api("/domains")}).then(function(d){
-    var dom=d["hydra:member"][0].domain;
-    var address=rnd(10,"abcdefghijklmnopqrstuvwxyz0123456789")+"@"+dom;
-    var password=rnd(14,"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789");
-    return api("/accounts",{method:"POST",body:JSON.stringify({address:address,password:password})}).then(function(acc){
-      return api("/token",{method:"POST",body:JSON.stringify({address:address,password:password})}).then(function(t){
-        S={address:address,password:password,id:acc.id,token:t.token,exp:Date.now()+TTL,out:[]};save();show();startPoll();fetchMsgs();
-      })
-    })
-  }).catch(function(){
+  return del.then(function(){return build(0)}).catch(function(err){
+    console.error("TempMail error:",err);
     $("#addr").textContent="Could not connect";$("#pass").textContent="–";
-    $("#p-in").innerHTML='<div class="empty">Could not reach the mail service. Check your internet and press <b>New address</b>.</div>';
+    $("#p-in").innerHTML='<div class="empty">Could not reach the mail service (error: '+esc(err&&err.message)+'). Check your internet or try another network, then press <b>New address</b>.</div>';
   })
 }
 function show(){$("#addr").textContent=S.address;$("#pass").textContent=S.password;renderOut();tickTimer()}
